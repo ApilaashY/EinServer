@@ -96,7 +96,7 @@ def download_movie(movie):
 
 
 # Download movies to the folder
-with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+with concurrent.futures.ThreadPoolExecutor(max_workers=int(os.getenv("CONCURRENT_DOWNLOADS", "2"))) as executor:
     # executor.map automatically assigns tasks and waits for them to complete
     results = executor.map(download_movie, movieLinks)
 
