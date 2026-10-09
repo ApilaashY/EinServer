@@ -6,6 +6,7 @@ from Movie import Movie
 import threading
 from downloader import download_m3u8, get_movie_download_link
 from time import sleep
+import concurrent.futures
 
 BASEURL = "https://einthusan.tv"
 load_dotenv()
@@ -92,6 +93,11 @@ def download_movie(movie):
     with open("downloaded", "w") as f:
         f.write("\n".join(list(downloadedMovies)))
 
+
+
 # Download movies to the folder
-for movie in movieLinks:
-    download_movie(movie)
+with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    # executor.map automatically assigns tasks and waits for them to complete
+    results = executor.map(download_movie, movieLinks)
+
+print("All Downloads Complete")
