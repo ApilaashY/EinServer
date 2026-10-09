@@ -56,12 +56,12 @@ for page in range(PAGECOUNT):
 
         link = title.get("href")
         if link:
-            movieLinks.append(Movie(title.find("h3").text, BASEURL + link))
+            movieLinks.append(Movie(title.find("h3").text, BASEURL + link, link.split("/")[-2]))
 
         print(title.find("h3").text)
 
 for movie in movieLinks:
-    print(f"Title: {movie.title}, Link: {movie.link}")
+    print(f"Title: {movie.title}, Link: {movie.link}, ID: {movie.id}")
 
 
 if not os.path.exists(FOLDER):
@@ -70,9 +70,9 @@ if not os.path.exists(FOLDER):
 
 def download_movie(movie):
     # Check if the movie is already downloaded
-    if os.path.exists(os.path.join(FOLDER, f"{movie.title}.mp4")):
+    if os.path.exists(os.path.join(FOLDER, f"{movie.id}.mp4")):
         print(f"{movie.title} is already downloaded.")
-        downloadedMovies.add(movie.title)
+        downloadedMovies.add(movie.id)
         with open("downloaded", "w") as f:
             f.write("\n".join(list(downloadedMovies)))
         return
@@ -85,11 +85,11 @@ def download_movie(movie):
 
     print(f"Downloading: {movie.title} from {m3u8_link}")
 
-    output_filename = os.path.join(FOLDER, f"{movie.title}.mp4")
-    download_m3u8(m3u8_link, output_filename)
+    output_filename = os.path.join(FOLDER, f"{movie.id}.mp4")
+    download_m3u8(m3u8_link, output_filename, testing=os.getenv("TESTING", "False") == "True")
 
     # Save the new downloaded movie list
-    downloadedMovies.add(movie.title)
+    downloadedMovies.add(movie.id)
     with open("downloaded", "w") as f:
         f.write("\n".join(list(downloadedMovies)))
 

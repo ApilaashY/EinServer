@@ -3,13 +3,14 @@ import m3u8_To_MP4
 import os
 from playwright.sync_api import sync_playwright
 
-def download_m3u8(m3u8_url, output_filename="output.mp4"):
+def download_m3u8(m3u8_url, output_filename="output.mp4", testing=False):
     # TESTING
     # Create a fake file for faster testing
-    # with open(output_filename, "w") as f:
-    #     f.write("")
+    if testing:
+        with open(output_filename, "w") as f:
+            f.write("")
+        return
 
-    # return
     """
     Downloads an M3U8 streaming playlist and saves it as a single MP4 file.
     """
