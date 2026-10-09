@@ -1,14 +1,16 @@
 import bs4
 import requests
 import os
+from dotenv import load_dotenv
 from Movie import Movie
 import threading
 from downloader import download_m3u8, get_movie_download_link
 from time import sleep
 
 BASEURL = "https://einthusan.tv"
-FOLDER = "movies"
-PAGECOUNT = 3
+load_dotenv()
+FOLDER = os.getenv("FOLDER", "movies")
+PAGECOUNT = int(os.getenv("PAGECOUNT", "3"))
 
 downloadedMovies = []
 
@@ -21,6 +23,13 @@ with open("downloaded", "r") as f:
     downloadedMovies = set(list(filter(lambda x: x.strip() != "", downloadedMovies)))
 
 print("Already Downloaded Movies: ", downloadedMovies)
+
+# Remove the movies that should not be in the folder
+if os.path.exists(FOLDER):
+    for movie_file in os.listdir(FOLDER):
+        movie_title, ext = os.path.splitext(movie_file)
+        if ext == ".mp4" and movie_title not in downloadedMovies:
+            os.remove(os.path.join(FOLDER, movie_file))
 
 moviePages = []
 for page in range(1, PAGECOUNT + 1):
