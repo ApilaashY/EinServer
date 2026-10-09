@@ -24,18 +24,11 @@ print("Already Downloaded Movies: ", downloadedMovies)
 
 moviePages = []
 for page in range(1, PAGECOUNT + 1):
-    tries = 0
-
-    while tries < 3:
-        try:
-            newMoviesPage = requests.get(
-                f"https://einthusan.tv/movie/results/?find=Recent&lang=tamil&page={page}"
-            )
-            moviePages.append(newMoviesPage)
-            break  # Exit the loop if the request was successful
-        except requests.RequestException as e:
-            tries += 1
-            sleep(3)
+    newMoviesPage = requests.get(
+        f"https://einthusan.tv/movie/results/?find=Recent&lang=tamil&page={page}"
+    )
+    moviePages.append(newMoviesPage)
+    sleep(3)
 
 movieLinks = []
 

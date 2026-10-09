@@ -6,10 +6,10 @@ from playwright.sync_api import sync_playwright
 def download_m3u8(m3u8_url, output_filename="output.mp4"):
     # TESTING
     # Create a fake file for faster testing
-    with open(output_filename, "w") as f:
-        f.write("")
+    # with open(output_filename, "w") as f:
+    #     f.write("")
 
-    return
+    # return
     """
     Downloads an M3U8 streaming playlist and saves it as a single MP4 file.
     """
@@ -19,6 +19,7 @@ def download_m3u8(m3u8_url, output_filename="output.mp4"):
         'ffmpeg',
         '-y',                             # Automatically overwrite existing files
         '-http_persistent', '1',          # Persist the connection (Must be before -i)
+        '-http_multiple', '1',             # Use multiple HTTP connections for HLS segments
         '-i', m3u8_url,
         '-c', 'copy', 
         '-bsf:a', 'aac_adtstoasc', 
