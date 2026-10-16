@@ -36,7 +36,7 @@ print("Already Downloaded Movies: ", downloadedMovies)
 if os.path.exists(FOLDER):
     for movie_file in os.listdir(FOLDER):
         movie_title, ext = os.path.splitext(movie_file)
-        if ext == ".mp4" and movie_title not in downloadedMovies:
+        if ext == ".mp4" and movie_title.split("-")[0].strip() not in downloadedMovies:
             os.remove(os.path.join(FOLDER, movie_file))
 
 moviePages = []
@@ -77,7 +77,7 @@ if not os.path.exists(FOLDER):
 
 def download_movie(movie):
     # Check if the movie is already downloaded
-    if os.path.exists(os.path.join(FOLDER, f"{movie.id}.mp4")):
+    if os.path.exists(os.path.join(FOLDER, f"{movie.id} - {movie.title}.mp4")):
         print(f"{movie.title} is already downloaded.")
         return movie.id, False
 
@@ -89,7 +89,7 @@ def download_movie(movie):
 
     print(f"Downloading: {movie.title} from {m3u8_link}")
 
-    output_filename = os.path.join(FOLDER, f"{movie.id}.mp4")
+    output_filename = os.path.join(FOLDER, f"{movie.id} - {movie.title}.mp4")
     downloaded = download_m3u8(
         m3u8_link,
         output_filename,
