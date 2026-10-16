@@ -115,7 +115,7 @@ def refresh_jellyfin():
     try:
         response = requests.post(
             f"{base_url}/Library/Refresh",
-            headers={"X-Emby-Token": JELLYFIN_API_KEY},
+            headers={"Authorization": f'MediaBrowser Token="{JELLYFIN_API_KEY}"'},
             timeout=10,
         )
         response.raise_for_status()
