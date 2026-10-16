@@ -15,6 +15,10 @@ FOLDER = os.getenv("FOLDER", "movies")
 PAGECOUNT = int(os.getenv("PAGECOUNT", "3"))
 JELLYFIN_ADDR = os.getenv("JELLYFINADDR", "").strip()
 JELLYFIN_API_KEY = os.getenv("JELLYFINAPIKEY", "").strip()
+TESTING_MODE = os.getenv("TESTING", "False") == "True"
+
+if TESTING_MODE:
+    print("[TESTING MODE ON]")
 
 downloadedMovies = []
 
@@ -89,7 +93,7 @@ def download_movie(movie):
     downloaded = download_m3u8(
         m3u8_link,
         output_filename,
-        testing=os.getenv("TESTING", "False") == "True",
+        testing=TESTING_MODE,
     )
     if not downloaded:
         return None
