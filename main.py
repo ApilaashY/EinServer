@@ -7,11 +7,14 @@ import threading
 from downloader import download_m3u8, get_movie_download_link
 from time import sleep
 import concurrent.futures
+from urllib.parse import urlsplit, urlunsplit
 
 BASEURL = "https://einthusan.tv"
 load_dotenv()
 FOLDER = os.getenv("FOLDER", "movies")
 PAGECOUNT = int(os.getenv("PAGECOUNT", "3"))
+JELLYFIN_ADDR = os.getenv("JELLYFINADDR", "").strip()
+JELLYFIN_API_KEY = os.getenv("JELLYFINAPIKEY", "").strip()
 
 downloadedMovies = []
 
@@ -72,32 +75,79 @@ def download_movie(movie):
     # Check if the movie is already downloaded
     if os.path.exists(os.path.join(FOLDER, f"{movie.id}.mp4")):
         print(f"{movie.title} is already downloaded.")
-        downloadedMovies.add(movie.id)
-        with open("downloaded", "w") as f:
-            f.write("\n".join(list(downloadedMovies)))
-        return
+        return movie.id, False
 
     # Get the m3u8 link from the movie page
     m3u8_link = get_movie_download_link(movie.link)
     if not m3u8_link:
         print(f"Failed to get download link for {movie.title}")
-        return
+        return None
 
     print(f"Downloading: {movie.title} from {m3u8_link}")
 
     output_filename = os.path.join(FOLDER, f"{movie.id}.mp4")
-    download_m3u8(m3u8_link, output_filename, testing=os.getenv("TESTING", "False") == "True")
+    downloaded = download_m3u8(
+        m3u8_link,
+        output_filename,
+        testing=os.getenv("TESTING", "False") == "True",
+    )
+    if not downloaded:
+        return None
 
-    # Save the new downloaded movie list
-    downloadedMovies.add(movie.id)
-    with open("downloaded", "w") as f:
-        f.write("\n".join(list(downloadedMovies)))
+    return movie.id, True
+
+
+def refresh_jellyfin():
+    if not JELLYFIN_ADDR or not JELLYFIN_API_KEY:
+        print("Jellyfin refresh skipped; configure JELLYFINADDR and JELLYFINAPIKEY.")
+        return
+
+    address = JELLYFIN_ADDR
+    if not address.startswith(("http://", "https://")):
+        address = f"http://{address}"
+    parsed_address = urlsplit(address)
+    if parsed_address.port is None:
+        parsed_address = parsed_address._replace(
+            netloc=f"{parsed_address.netloc}:8096"
+        )
+    base_url = urlunsplit(parsed_address).rstrip("/")
+
+    try:
+        response = requests.post(
+            f"{base_url}/Library/Refresh",
+            headers={"X-Emby-Token": JELLYFIN_API_KEY},
+            timeout=10,
+        )
+        response.raise_for_status()
+        print("Jellyfin library refresh requested.")
+    except requests.RequestException as error:
+        print(f"Could not request Jellyfin library refresh: {error}")
 
 
 
 # Download movies to the folder
 with concurrent.futures.ThreadPoolExecutor(max_workers=int(os.getenv("CONCURRENT_DOWNLOADS", "2"))) as executor:
-    # executor.map automatically assigns tasks and waits for them to complete
-    results = executor.map(download_movie, movieLinks)
+    futures = {
+        executor.submit(download_movie, movie): movie
+        for movie in movieLinks
+    }
+    for future in concurrent.futures.as_completed(futures):
+        movie = futures[future]
+        try:
+            result = future.result()
+        except Exception as error:
+            print(f"Download failed for {movie.title}: {error}")
+            continue
+
+        if result is None:
+            continue
+
+        movie_id, is_new_download = result
+        downloadedMovies.add(movie_id)
+        with open("downloaded", "w") as f:
+            f.write("\n".join(downloadedMovies))
+
+        if is_new_download:
+            refresh_jellyfin()
 
 print("All Downloads Complete")

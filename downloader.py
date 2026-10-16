@@ -9,7 +9,7 @@ def download_m3u8(m3u8_url, output_filename="output.mp4", testing=False):
     if testing:
         with open(output_filename, "w") as f:
             f.write("")
-        return
+        return True
 
     """
     Downloads an M3U8 streaming playlist and saves it as a single MP4 file.
@@ -32,10 +32,13 @@ def download_m3u8(m3u8_url, output_filename="output.mp4", testing=False):
         # Execute the FFmpeg command
         subprocess.run(command, check=True)
         print(f"Download complete! Saved as {output_filename}")
+        return True
     except subprocess.CalledProcessError as e:
         print(f"An error occurred during downloading: {e}")
+        return False
     except FileNotFoundError:
         print("Error: FFmpeg is not installed or not found in your system PATH.")
+        return False
 
 
 def get_movie_download_link(movie_page_url) -> str:
