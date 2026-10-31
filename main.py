@@ -15,6 +15,7 @@ FOLDER = os.getenv("FOLDER", "movies")
 PAGECOUNT = int(os.getenv("PAGECOUNT", "3"))
 JELLYFIN_ADDR = os.getenv("JELLYFINADDR", "").strip()
 JELLYFIN_API_KEY = os.getenv("JELLYFINAPIKEY", "").strip()
+DOWNLOADED_FILE = os.getenv("DOWNLOADED_FILE", "downloaded")
 TESTING_MODE = os.getenv("TESTING", "False") == "True"
 
 if TESTING_MODE:
@@ -23,10 +24,10 @@ if TESTING_MODE:
 downloadedMovies = []
 
 # Check if the downloaded text file is there and if not create it
-if not os.path.exists("downloaded"):
-    with open("downloaded", "w") as f:
+if not os.path.exists(DOWNLOADED_FILE):
+    with open(DOWNLOADED_FILE, "w") as f:
         f.write("")
-with open("downloaded", "r") as f:
+with open(DOWNLOADED_FILE, "r") as f:
     downloadedMovies = f.read().split("\n")
     downloadedMovies = set(list(filter(lambda x: x.strip() != "", downloadedMovies)))
 
@@ -148,7 +149,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=int(os.getenv("CONCURRENT
 
         movie_id, is_new_download = result
         downloadedMovies.add(movie_id)
-        with open("downloaded", "w") as f:
+        with open(DOWNLOADED_FILE, "w") as f:
             f.write("\n".join(downloadedMovies))
 
         if is_new_download:
