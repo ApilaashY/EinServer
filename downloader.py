@@ -23,8 +23,10 @@ def download_m3u8(m3u8_url, output_filename="output.mkv", testing=False, on_star
         '-http_multiple', '1',             # Use multiple HTTP connections for HLS segments
         # Reconnect if the connection drops, e.g. after a long pause
         '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '30',
+        '-fflags', '+genpts',             # Generate missing timestamps (MKV rejects packets without them)
         '-i', m3u8_url,
         '-c', 'copy', 
+        '-avoid_negative_ts', 'make_zero',
         '-bsf:a', 'aac_adtstoasc', 
         output_filename
     ]
