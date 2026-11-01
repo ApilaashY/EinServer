@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from Movie import Movie
 import threading
-from downloader import download_m3u8, get_movie_download_link, priority_job, wait_for_turn
+from downloader import download_m3u8, get_movie_download_link
 from time import sleep
 import concurrent.futures
 import json
@@ -298,16 +298,6 @@ def start_on_demand(code):
                 locate_in_jellyfin(code, title, job)
 
         try:
-            with priority_job():
-                run_job(code, job, locate)
-        finally:
-            if job["status"] == "error":
-                # Allow a retry
-                with downloaded_lock:
-                    jobs.pop(code, None)
-
-    def run_job(code, job, locate):
-        try:
             movie = Movie(
                 fetch_title(code),
                 f"{BASEURL}/movie/watch/{code}/?lang={API_LANG}",
@@ -316,16 +306,23 @@ def start_on_demand(code):
             result = download_movie(
                 movie,
                 on_ready=lambda: threading.Thread(target=locate, args=(movie.title,)).start(),
-                priority=True,
+                urgent=True,
             )
             if result:
-                record_downloaded(result[0])
-                locate(movie.title)  # file already existed, or download was instant
+                if result[1] is not None:
+                    record_downloaded(result[0])
+                # Also covers files that already existed or merged into the queue
+                locate(movie.title)
             elif not located.is_set():
                 job.update(status="error", error="Download failed. Check the code.")
         except Exception as error:
             print(f"On-demand download failed for {code}: {error}")
             job.update(status="error", error="Could not start the download. Check the code.")
+        finally:
+            if job["status"] == "error":
+                # Allow a retry
+                with downloaded_lock:
+                    jobs.pop(code, None)
 
     threading.Thread(target=run, daemon=True).start()
 

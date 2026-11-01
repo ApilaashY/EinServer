@@ -1,44 +1,9 @@
-import signal
 import subprocess
-import threading
-from contextlib import contextmanager
 import m3u8_To_MP4
 import os
 from playwright.sync_api import sync_playwright
 
-# Priority (on-demand) jobs pause normal downloads until every priority job is done
-_lock = threading.Lock()
-_priority_jobs = 0
-_normal_procs = set()
-_normal_may_run = threading.Event()
-_normal_may_run.set()
-
-
-@contextmanager
-def priority_job():
-    global _priority_jobs
-    with _lock:
-        _priority_jobs += 1
-        _normal_may_run.clear()
-        for proc in _normal_procs:
-            proc.send_signal(signal.SIGSTOP)
-    try:
-        yield
-    finally:
-        with _lock:
-            _priority_jobs -= 1
-            if _priority_jobs == 0:
-                for proc in _normal_procs:
-                    proc.send_signal(signal.SIGCONT)
-                _normal_may_run.set()
-
-
-def wait_for_turn():
-    """Blocks a normal (non-priority) download while a priority job is running."""
-    _normal_may_run.wait()
-
-
-def download_m3u8(m3u8_url, output_filename="output.mkv", testing=False, on_start=None, priority=False):
+def download_m3u8(m3u8_url, output_filename="output.mkv", testing=False, on_start=None, on_process=None):
     # TESTING
     # Create a fake file for faster testing
     if testing:
@@ -58,9 +23,6 @@ def download_m3u8(m3u8_url, output_filename="output.mkv", testing=False, on_star
         '-http_multiple', '1',             # Use multiple HTTP connections for HLS segments
         # Reconnect if the connection drops, e.g. after a long pause
         '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '30',
-        '-reconnect', '1',                # Survive dropped connections (e.g. after a long pause)
-        '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '30',
         '-i', m3u8_url,
         '-c', 'copy', 
         '-bsf:a', 'aac_adtstoasc', 
@@ -71,26 +33,15 @@ def download_m3u8(m3u8_url, output_filename="output.mkv", testing=False, on_star
         print(f"Starting download for: {m3u8_url}")
         # Execute the FFmpeg command
         # MKV is playable while still being written, so Jellyfin can stream the partial file
-        if not priority:
-            wait_for_turn()
         process = subprocess.Popen(command)
         if on_process:
             on_process(process)
-        if not priority:
-            with _lock:
-                _normal_procs.add(process)
-                if _priority_jobs:
-                    process.send_signal(signal.SIGSTOP)
         if on_start:
             try:
                 process.wait(timeout=15)
             except subprocess.TimeoutExpired:
                 on_start()
-        try:
-            returncode = process.wait()
-        finally:
-            with _lock:
-                _normal_procs.discard(process)
+        returncode = process.wait()
         if returncode != 0:
             raise subprocess.CalledProcessError(returncode, command)
         print(f"Download complete! Saved as {output_filename}")
