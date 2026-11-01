@@ -15,6 +15,9 @@ CONTAINER_NAME="${CONTAINER_NAME:-ein}"
 DOCKER_CPUS="${DOCKER_CPUS:-2}"
 DOCKER_CPU_SHARES="${DOCKER_CPU_SHARES:-256}"
 DOCKER_MEMORY="${DOCKER_MEMORY:-1280m}"
+API_PORT="${API_PORT:-0}"
+PORT_ARGS=()
+[ "$API_PORT" != "0" ] && PORT_ARGS=(-p "$API_PORT:$API_PORT")
 
 mkdir -p "$FOLDER"
 mkdir -p "$(dirname "$DOWNLOADED_FILE")"
@@ -37,6 +40,7 @@ docker run -d --name "$CONTAINER_NAME" --restart no \
   --cpus "$DOCKER_CPUS" \
   --cpu-shares "$DOCKER_CPU_SHARES" \
   --memory "$DOCKER_MEMORY" --memory-swap "$DOCKER_MEMORY" \
+  "${PORT_ARGS[@]}" \
   --env-file .env \
   -e FOLDER=/movie \
   -e DOWNLOADED_FILE=/data/downloaded \
