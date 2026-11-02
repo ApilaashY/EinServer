@@ -248,7 +248,7 @@ def find_jellyfin_item(code, title):
             "Recursive": "true",
             "IncludeItemTypes": "Movie",
             "Fields": "Path",
-            "SearchTerm": title,
+            "SearchTerm": code,
         },
         headers={"Authorization": f'MediaBrowser Token="{JELLYFIN_API_KEY}"'},
         timeout=10,
@@ -262,7 +262,7 @@ def find_jellyfin_item(code, title):
 
 def locate_in_jellyfin(code, title, job):
     base = JELLYFIN_PUBLIC_URL or jellyfin_base_url()
-    search_url = f"{base}/web/index.html#!/search.html?query={quote(title)}"
+    search_url = f"{base}/web/index.html#!/search.html?query={quote(code)}"
     if not JELLYFIN_ADDR or not JELLYFIN_API_KEY:
         job.update(status="ready", url=search_url)
         return
