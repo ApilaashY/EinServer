@@ -337,7 +337,13 @@ class MovieRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        if self.path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
         parts = self.path.split("?")[0].strip("/").split("/")
+        if parts[0] == "watch":
+            parts = parts[1:]
         is_status = len(parts) == 2 and parts[0] == "status"
         code = parts[-1]
         if len(parts) > 2 or (len(parts) == 2 and not is_status) or not CODE_RE.match(code):
