@@ -10,6 +10,7 @@ import concurrent.futures
 import json
 import re
 import signal
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, urlunsplit, quote
 
@@ -23,6 +24,8 @@ DOWNLOADED_FILE = os.getenv("DOWNLOADED_FILE", "downloaded")
 API_PORT = int(os.getenv("API_PORT", "0"))
 API_LANG = os.getenv("API_LANG", "tamil")
 JELLYFIN_PUBLIC_URL = os.getenv("JELLYFIN_PUBLIC_URL", "").strip().rstrip("/")
+URL_DOWNLOADS_FILE = os.getenv("URL_DOWNLOADS_FILE", "url_downloads")
+URL_RETENTION_DAYS = int(os.getenv("URL_RETENTION_DAYS", "7"))
 TESTING_MODE = os.getenv("TESTING", "False") == "True"
 
 if TESTING_MODE:
@@ -40,12 +43,60 @@ with open(DOWNLOADED_FILE, "r") as f:
 
 print("Already Downloaded Movies: ", downloadedMovies)
 
+# Movies downloaded through the API are recorded as "<id> <unix time>" lines. The record
+# lives next to the downloaded file.
+URL_RECORD_FILE = URL_DOWNLOADS_FILE
+url_record_lock = threading.Lock()
+
+
+def read_url_record():
+    if not os.path.exists(URL_RECORD_FILE):
+        return {}
+    with open(URL_RECORD_FILE) as f:
+        return dict(line.split() for line in f if len(line.split()) == 2)
+
+
+def write_url_record(record):
+    with open(URL_RECORD_FILE, "w") as f:
+        f.write("".join(f"{movie_id} {stamp}\n" for movie_id, stamp in record.items()))
+
+
+# Delete API downloads older than the retention period (startup only)
+if os.path.exists(FOLDER):
+    cutoff = time.time() - URL_RETENTION_DAYS * 86400
+    url_record = read_url_record()
+    for movie_id, stamp in list(url_record.items()):
+        if float(stamp) >= cutoff:
+            continue
+        for movie_file in os.listdir(FOLDER):
+            if movie_file.startswith(f"{movie_id} - "):
+                os.remove(os.path.join(FOLDER, movie_file))
+                print(f"Deleted expired API download: {movie_file}")
+        downloadedMovies.discard(movie_id)
+        del url_record[movie_id]
+    write_url_record(url_record)
+    with open(DOWNLOADED_FILE, "w") as f:
+        f.write("\n".join(downloadedMovies))
+
 # Remove the movies that should not be in the folder
 if os.path.exists(FOLDER):
     for movie_file in os.listdir(FOLDER):
         movie_title, ext = os.path.splitext(movie_file)
         if ext in (".mp4", ".mkv") and movie_title.split("-")[0].strip() not in downloadedMovies:
             os.remove(os.path.join(FOLDER, movie_file))
+
+    # And the reverse: forget downloaded entries whose file is no longer in the folder
+    ids_on_disk = {
+        os.path.splitext(f)[0].split("-")[0].strip()
+        for f in os.listdir(FOLDER)
+        if os.path.splitext(f)[1] in (".mp4", ".mkv")
+    }
+    missing = downloadedMovies - ids_on_disk
+    if missing:
+        print("Removing downloaded entries with no file:", missing)
+        downloadedMovies -= missing
+        with open(DOWNLOADED_FILE, "w") as f:
+            f.write("\n".join(downloadedMovies))
 
 moviePages = []
 for page in range(1, PAGECOUNT + 1):
@@ -208,6 +259,13 @@ def record_downloaded(movie_id):
             f.write("\n".join(downloadedMovies))
 
 
+def record_url_download(movie_id):
+    with url_record_lock:
+        record = read_url_record()
+        record[movie_id] = str(int(time.time()))
+        write_url_record(record)
+
+
 # On-demand downloads: GET /<code> shows a loading page, downloads the movie, scans
 # Jellyfin, then sends the browser to the movie's page in Jellyfin
 CODE_RE = re.compile(r"^[A-Za-z0-9]{2,12}$")
@@ -261,7 +319,8 @@ def find_jellyfin_item(code, title):
 
 
 def locate_in_jellyfin(code, title, job):
-    base = JELLYFIN_PUBLIC_URL or jellyfin_base_url()
+    # Browser-facing URL: explicit setting, else the host the user reached this API on
+    base = JELLYFIN_PUBLIC_URL or f"http://{job['host']}:8096"
     search_url = f"{base}/web/index.html#!/search.html?query={quote(code)}"
     if not JELLYFIN_ADDR or not JELLYFIN_API_KEY:
         job.update(status="ready", url=search_url)
@@ -283,11 +342,11 @@ def locate_in_jellyfin(code, title, job):
     job.update(status="ready", url=search_url)  # scan is slow; fall back to search
 
 
-def start_on_demand(code):
+def start_on_demand(code, host):
     with downloaded_lock:
         if code in jobs:
             return
-        job = jobs[code] = {"status": "starting"}
+        job = jobs[code] = {"status": "starting", "host": host}
 
     def run():
         located = threading.Event()
@@ -311,6 +370,8 @@ def start_on_demand(code):
             if result:
                 if result[1] is not None:
                     record_downloaded(result[0])
+                if result[1]:
+                    record_url_download(result[0])
                 # Also covers files that already existed or merged into the queue
                 locate(movie.title)
             elif not located.is_set():
@@ -355,7 +416,8 @@ class MovieRequestHandler(BaseHTTPRequestHandler):
             self.reply(200, json.dumps(job), "application/json")
             return
 
-        start_on_demand(code)
+        host = (self.headers.get("Host") or "localhost").rsplit(":", 1)[0]
+        start_on_demand(code, host)
         self.reply(200, LOADING_PAGE.replace("__CODE__", code), "text/html")
 
     def log_message(self, format, *args):

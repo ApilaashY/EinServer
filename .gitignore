@@ -5,3 +5,4 @@ movies/
 downloaded
 *.DS_Store
 nohup.out
+url_downloads

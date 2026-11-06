@@ -5,3 +5,4 @@ __pycache__/
 movies/
 downloaded
 .DS_Store
+url_downloads
